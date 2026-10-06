@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -62,7 +62,7 @@
       <div class="summary-card border-red">
         <div class="summary-card-title">Riesgo Crítico (Activos)</div>
         <div class="summary-card-value text-red" id="kpi-critical-risk">-</div>
-        <div class="summary-card-sub">3+ meses &lt; 50%</div>
+        <div class="summary-card-sub">Últimos 3 meses &lt; 50%</div>
       </div>
       <div class="summary-card border-green">
         <div class="summary-card-title">Consistentes Verde (Activos)</div>
@@ -106,6 +106,16 @@
           <label for="filter-status">Status Agente:</label>
           <select id="filter-status"><option value="">Todos</option></select>
         </div>
+        <div>
+          <label for="filter-unassigned">Filtrar Sin Asignación:</label>
+          <select id="filter-unassigned">
+            <option value="">Todos</option>
+            <option value="sin_coordinador">Sin Coordinador</option>
+            <option value="sin_supervisor">Sin Supervisor</option>
+            <option value="sin_trainer">Sin Trainer</option>
+            <option value="sin_lider">Sin Ningún Líder</option>
+          </select>
+        </div>
         <div class="filter-actions-container">
           <button id="btn-reset" type="button" class="btn-filter">Limpiar Filtros</button>
           <button id="btn-export-pdf" type="button" class="btn-filter btn-pdf">Exportar a PDF</button>
@@ -116,7 +126,7 @@
     <!-- TAB FOCO: Foco (Página Principal) -->
     <section id="tab-focus" class="table-card tab-content active">
       <div class="table-header-flex">
-        <h2>Foco (Página Principal)</h2>
+        <h2>Cumplimientos Mensuales</h2>
         <div class="header-buttons" style="display: flex; gap: 10px;">
           <button id="btn-critical-risk" type="button" class="btn-risk" onclick="toggleCriticalRiskFilter()">
             ⚠️ Mostrar Agentes en Riesgo Crítico
@@ -139,7 +149,7 @@
 
     <!-- TAB 1: Tabla de Agentes Completa -->
     <section id="tab-agents" class="table-card tab-content" style="display: none;">
-      <h2>Listado de Agentes</h2>
+      <h2>Información y Rendimiento por Agente</h2>
       <div class="table-wrapper">
         <table id="agents-table">
           <thead>
@@ -167,6 +177,33 @@
 
     <!-- TAB 2: Acumulativos por Líder -->
     <section id="tab-leaders" class="tab-content" style="display: none;">
+      
+      <!-- Acumulativo por Trainer -->
+      <div class="table-card" style="margin-bottom: 25px;">
+        <h2>Acumulativo por Trainer</h2>
+        <div class="table-wrapper">
+          <table id="trainers-table">
+            <thead>
+              <tr>
+                <th onclick="handleSort('trainers-table', 'leader')">Trainer</th>
+                <th onclick="handleSort('trainers-table', 'uniqueAgentsCount')">Agentes Únicos a Cargo</th>
+                <th onclick="handleSort('trainers-table', 'recordsCount')">Cantidad de Registros</th>
+                <th onclick="handleSort('trainers-table', 'metaTotal')">Meta Total</th>
+                <th onclick="handleSort('trainers-table', 'v1')">V1</th>
+                <th onclick="handleSort('trainers-table', 'v2')">V2</th>
+                <th onclick="handleSort('trainers-table', 'v3')">V3</th>
+                <th onclick="handleSort('trainers-table', 'v4')">V4</th>
+                <th onclick="handleSort('trainers-table', 'v5')">V5</th>
+                <th onclick="handleSort('trainers-table', 'cierre')">Cierre Total</th>
+                <th onclick="handleSort('trainers-table', 'compliancePct')">Cumplimiento Promedio %</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Acumulativo por Supervisor -->
       <div class="table-card" style="margin-bottom: 25px;">
         <h2>Acumulativo por Supervisor</h2>
         <div class="table-wrapper">
@@ -174,7 +211,8 @@
             <thead>
               <tr>
                 <th onclick="handleSort('supervisors-table', 'leader')">Supervisor</th>
-                <th onclick="handleSort('supervisors-table', 'agentsCount')">Agentes a Cargo</th>
+                <th onclick="handleSort('supervisors-table', 'uniqueAgentsCount')">Agentes Únicos a Cargo</th>
+                <th onclick="handleSort('supervisors-table', 'recordsCount')">Cantidad de Registros</th>
                 <th onclick="handleSort('supervisors-table', 'metaTotal')">Meta Total</th>
                 <th onclick="handleSort('supervisors-table', 'v1')">V1</th>
                 <th onclick="handleSort('supervisors-table', 'v2')">V2</th>
@@ -190,6 +228,7 @@
         </div>
       </div>
 
+      <!-- Acumulativo por Coordinador -->
       <div class="table-card">
         <h2>Acumulativo por Coordinador</h2>
         <div class="table-wrapper">
@@ -197,7 +236,8 @@
             <thead>
               <tr>
                 <th onclick="handleSort('coordinators-table', 'leader')">Coordinador</th>
-                <th onclick="handleSort('coordinators-table', 'agentsCount')">Agentes a Cargo</th>
+                <th onclick="handleSort('coordinators-table', 'uniqueAgentsCount')">Agentes Únicos a Cargo</th>
+                <th onclick="handleSort('coordinators-table', 'recordsCount')">Cantidad de Registros</th>
                 <th onclick="handleSort('coordinators-table', 'metaTotal')">Meta Total</th>
                 <th onclick="handleSort('coordinators-table', 'v1')">V1</th>
                 <th onclick="handleSort('coordinators-table', 'v2')">V2</th>
@@ -212,6 +252,7 @@
           </table>
         </div>
       </div>
+
     </section>
 
     <!-- TAB 3: Tendencias -->

@@ -65,20 +65,18 @@ function filterRow(row) {
 
 // Lista de etiquetas clave para delimitar el parser de las sesiones
 const EXACT_KEYWORDS = [
-  "📅 Fecha", "🔗 URLTr", "🗣️ Speech", "📚 Producto", "🛡️ Objeciones", "🤝 Cierre", "📌 Acuerdos \\+ Estado"
+  "📅 Fecha", "🔗 URLTr", "🗣️ Speech", "📚 Producto", "🛡️ Objeciones", "🤝 Cierre", "📌 Acuerdos"
 ];
 
 function parseSessionField(fullText, exactLabel) {
   if (!fullText) return '-';
   
-  // Escapar la etiqueta buscada para usarla dentro de la Regex
+  // Escapar caracteres especiales de Regex
   const escapedLabel = exactLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const lookaheadPattern = EXACT_KEYWORDS.join('|');
+  const lookaheadPattern = EXACT_KEYWORDS.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
   
-  // Expresión regular corregida:
-  // consume únicamente los separadores pegados al título, permitiendo "-" internos en las respuestas.
   const regex = new RegExp(
-    `${escapedLabel}(?:\\s*[:\\-=])?\\s*([\\s\\S]*?)(?=(?:\\n\\s*)?(?:${lookaheadPattern})|$)`, 
+    `${escapedLabel}(?:\\s*\\+?\\s*Estado)?(?:\\s*[:\\-=])?\\s*([\\s\\S]*?)(?=(?:\\n\\s*)?(?:${lookaheadPattern})|$)`, 
     'i'
   );
   
@@ -262,12 +260,41 @@ function populateFilters(data) {
   const trainers = [...new Set(data.map(item => getRowValue(item, 'TRAINER')).filter(Boolean))];
   const supervisors = [...new Set(data.map(item => getRowValue(item, 'SUPERVISOR')).filter(Boolean))];
   const coordinadores = [...new Set(data.map(item => getRowValue(item, 'COORDINADOR')).filter(Boolean))];
-  const statuses = [...new Set(data.map(item => getRowValue(item, 'STATUS AGENTE')).filter(Boolean))];
+  const statuses = [...new Set(data.map(item => getRowValue(item, 'STATUS AGENTE')).filter(val => val && val !== '-'))];
 
   fillSelect('filter-trainer', trainers);
   fillSelect('filter-supervisor', supervisors);
   fillSelect('filter-coordinador', coordinadores);
-  fillSelect('filter-status', statuses);
+  fillSelectWithUnassignedStatus('filter-status', statuses);
+}
+
+function fillSelectWithUnassignedStatus(elementId, options) {
+  const select = document.getElementById(elementId);
+  if (!select) return;
+
+  const currentVal = select.value;
+  select.innerHTML = '<option value="">Todos</option>';
+
+  const unassignedOpt = document.createElement('option');
+  unassignedOpt.value = 'sin_status';
+  unassignedOpt.textContent = 'Sin Status';
+  select.appendChild(unassignedOpt);
+
+  options.sort().forEach(opt => {
+    const option = document.createElement('option');
+    option.value = opt;
+    option.textContent = opt;
+    select.appendChild(option);
+  });
+
+  if (options.includes(currentVal) || currentVal === 'sin_status') {
+    select.value = currentVal;
+  }
+
+  if (!select.dataset.hasListener) {
+    select.addEventListener('change', filterData);
+    select.dataset.hasListener = "true";
+  }
 }
 
 function fillSelect(elementId, options) {
@@ -300,16 +327,46 @@ function filterData() {
   const supervisorVal = document.getElementById('filter-supervisor').value;
   const coordinadorVal = document.getElementById('filter-coordinador').value;
   const statusVal = document.getElementById('filter-status').value;
+  
+  // Capturar el filtro de Sin Asignar
+  const unassignedVal = document.getElementById('filter-unassigned')?.value || '';
 
   filteredData = rawData.filter(item => {
     const agentName = getRowValue(item, 'PROMOTOR').toLowerCase();
+    const trainer = getRowValue(item, 'TRAINER');
+    const supervisor = getRowValue(item, 'SUPERVISOR');
+    const coordinador = getRowValue(item, 'COORDINADOR');
+    const statusAgente = getRowValue(item, 'STATUS AGENTE');
+
     const matchSearch = !searchVal || agentName.includes(searchVal);
-    const matchTrainer = !trainerVal || getRowValue(item, 'TRAINER') === trainerVal;
-    const matchSupervisor = !supervisorVal || getRowValue(item, 'SUPERVISOR') === supervisorVal;
-    const matchCoordinador = !coordinadorVal || getRowValue(item, 'COORDINADOR') === coordinadorVal;
-    const matchStatus = !statusVal || getRowValue(item, 'STATUS AGENTE') === statusVal;
+    const matchTrainer = !trainerVal || trainer === trainerVal;
+    const matchSupervisor = !supervisorVal || supervisor === supervisorVal;
+    const matchCoordinador = !coordinadorVal || coordinador === coordinadorVal;
+
+    // Evaluación del filtro Status Agente (incluyendo "Sin Status")
+    let matchStatus = true;
+    if (statusVal === 'sin_status') {
+      matchStatus = !statusAgente || statusAgente === '-' || statusAgente.trim() === '';
+    } else if (statusVal) {
+      matchStatus = statusAgente === statusVal;
+    }
+
+    // Validación para promotores sin asignación
+    let matchUnassigned = true;
+    if (unassignedVal === 'sin_coordinador') {
+      matchUnassigned = !coordinador || coordinador === '-' || coordinador.toLowerCase().includes('sin');
+    } else if (unassignedVal === 'sin_supervisor') {
+      matchUnassigned = !supervisor || supervisor === '-' || supervisor.toLowerCase().includes('sin');
+    } else if (unassignedVal === 'sin_trainer') {
+      matchUnassigned = !trainer || trainer === '-' || trainer.toLowerCase().includes('sin');
+    } else if (unassignedVal === 'sin_lider') {
+      const noCoord = !coordinador || coordinador === '-' || coordinador.toLowerCase().includes('sin');
+      const noSup = !supervisor || supervisor === '-' || supervisor.toLowerCase().includes('sin');
+      const noTrain = !trainer || trainer === '-' || trainer.toLowerCase().includes('sin');
+      matchUnassigned = noCoord || noSup || noTrain;
+    }
     
-    return matchSearch && matchTrainer && matchSupervisor && matchCoordinador && matchStatus;
+    return matchSearch && matchTrainer && matchSupervisor && matchCoordinador && matchStatus && matchUnassigned;
   });
 
   renderAllTables();
@@ -324,6 +381,7 @@ function resetAllFilters() {
   document.getElementById('filter-supervisor').value = '';
   document.getElementById('filter-coordinador').value = '';
   document.getElementById('filter-status').value = '';
+  document.getElementById('filter-unassigned').value = '';
 
   onlyCriticalRisk = false;
   onlyConsistentGreen = false;
@@ -337,46 +395,43 @@ function resetAllFilters() {
   loadDashboardData();
 }
 
-function hasThreeConsecutiveLowMonths(agentMonthsData) {
+function hasLastThreeLowMonths(agentMonthsData) {
   const monthKeys = Object.keys(MONTH_URLS);
-  let consecutiveLowCount = 0;
+  // Tomamos únicamente las claves de los últimos 3 meses
+  const last3Months = monthKeys.slice(-3);
 
-  for (let m of monthKeys) {
+  // Si no hay al menos 3 meses registrados en la aplicación, no aplica
+  if (last3Months.length < 3) return false;
+
+  // Verificamos que los 3 meses estén presentes y tengan < 50%
+  return last3Months.every(m => {
     const record = agentMonthsData[m];
     if (record && record.cumplimiento !== '-') {
       const pct = parseNum(record.cumplimiento);
-      if (pct < 50) {
-        consecutiveLowCount++;
-        if (consecutiveLowCount >= 3) return true;
-      } else {
-        consecutiveLowCount = 0;
-      }
-    } else {
-      consecutiveLowCount = 0;
+      return pct < 50;
     }
-  }
-  return false;
+    return false;
+  });
 }
 
 function hasTwoConsecutiveGreenMonths(agentMonthsData) {
   const monthKeys = Object.keys(MONTH_URLS);
-  let consecutiveGreenCount = 0;
+  
+  // Requerimos al menos 2 meses en el sistema para evaluar la consistencia
+  if (monthKeys.length < 2) return false;
 
-  for (let m of monthKeys) {
+  // Extraer las claves de los 2 últimos meses registrados
+  const last2Months = monthKeys.slice(-2);
+
+  // Verificar que en AMBOS meses más recientes el cumplimiento sea >= 90%
+  return last2Months.every(m => {
     const record = agentMonthsData[m];
     if (record && record.cumplimiento !== '-') {
       const pct = parseNum(record.cumplimiento);
-      if (pct >= 90) {
-        consecutiveGreenCount++;
-        if (consecutiveGreenCount >= 2) return true;
-      } else {
-        consecutiveGreenCount = 0;
-      }
-    } else {
-      consecutiveGreenCount = 0;
+      return pct >= 90;
     }
-  }
-  return false;
+    return false;
+  });
 }
 
 function switchTab(tabName, evt) {
@@ -614,13 +669,16 @@ function renderFocusTable(data) {
   if (onlyCriticalRisk) {
     agentsList = agentsList.filter(agent => {
       const isActive = agent.lastMonthStatus.includes('ACTIVO');
-      return isActive && hasThreeConsecutiveLowMonths(agent.monthsData);
+      return isActive && hasLastThreeLowMonths(agent.monthsData);
     });
   } else if (onlyConsistentGreen) {
-    agentsList = agentsList.filter(agent => hasTwoConsecutiveGreenMonths(agent.monthsData));
+    agentsList = agentsList.filter(agent => {
+      const isActive = agent.lastMonthStatus.includes('ACTIVO');
+      return isActive && hasTwoConsecutiveGreenMonths(agent.monthsData);
+    });
   } else if (onlyRegularPerformers) {
     agentsList = agentsList.filter(agent => 
-      !hasThreeConsecutiveLowMonths(agent.monthsData) && 
+      !hasLastThreeLowMonths(agent.monthsData) && 
       !hasTwoConsecutiveGreenMonths(agent.monthsData)
     );
   }
@@ -689,6 +747,7 @@ function renderFocusTable(data) {
 }
 
 function renderLeadersTables(data) {
+  renderGroupedTable(data, 'TRAINER', '#trainers-table tbody', 'trainers-table');
   renderGroupedTable(data, 'SUPERVISOR', '#supervisors-table tbody', 'supervisors-table');
   renderGroupedTable(data, 'COORDINADOR', '#coordinators-table tbody', 'coordinators-table');
 }
@@ -699,7 +758,7 @@ function renderGroupedTable(data, groupKey, selector, tableId) {
   tbody.innerHTML = '';
 
   if (!data || data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">No hay datos disponibles.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;">No hay datos disponibles.</td></tr>';
     return;
   }
 
@@ -708,11 +767,13 @@ function renderGroupedTable(data, groupKey, selector, tableId) {
   data.forEach(row => {
     const rawLeader = getRowValue(row, groupKey);
     const leader = rawLeader ? rawLeader.trim() : `Sin ${groupKey.toLowerCase()}`;
+    const agentName = getRowValue(row, 'PROMOTOR');
 
     if (!groupMap[leader]) {
       groupMap[leader] = {
         leader: leader,
-        agentsCount: 0,
+        recordsCount: 0,                   // Muestra la "Cantidad de Registros" (lo que antes era Agentes a Cargo)
+        uniqueAgentsSet: new Set(),         // Guarda los nombres únicos para la cuenta de "Agentes Únicos a Cargo"
         metaTotal: 0,
         v1: 0, v2: 0, v3: 0, v4: 0, v5: 0,
         cierre: 0,
@@ -720,7 +781,11 @@ function renderGroupedTable(data, groupKey, selector, tableId) {
       };
     }
 
-    groupMap[leader].agentsCount += 1;
+    groupMap[leader].recordsCount += 1;
+    if (agentName) {
+      groupMap[leader].uniqueAgentsSet.add(agentName.toUpperCase());
+    }
+
     groupMap[leader].metaTotal += parseNum(getRowValue(row, 'META'));
     groupMap[leader].v1 += parseNum(getRowValue(row, 'V1'));
     groupMap[leader].v2 += parseNum(getRowValue(row, 'V2'));
@@ -742,15 +807,15 @@ function renderGroupedTable(data, groupKey, selector, tableId) {
     const isAsc = sortInfo.isAsc;
 
     leadersList.sort((a, b) => {
-      let valA = a[col];
-      let valB = b[col];
+      let valA = col === 'uniqueAgentsCount' ? a.uniqueAgentsSet.size : a[col];
+      let valB = col === 'uniqueAgentsCount' ? b.uniqueAgentsSet.size : b[col];
 
       if (typeof valA === 'number' && typeof valB === 'number') {
         return isAsc ? valA - valB : valB - valA;
       }
 
-      valA = valA.toString().toLowerCase();
-      valB = valB.toString().toLowerCase();
+      valA = valA ? valA.toString().toLowerCase() : '';
+      valB = valB ? valB.toString().toLowerCase() : '';
 
       if (valA < valB) return isAsc ? -1 : 1;
       if (valA > valB) return isAsc ? 1 : -1;
@@ -760,11 +825,13 @@ function renderGroupedTable(data, groupKey, selector, tableId) {
 
   leadersList.forEach(l => {
     const complianceHTML = getComplianceBadge(l.compliancePct.toString());
+    const uniqueAgentsCount = l.uniqueAgentsSet.size;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${l.leader}</strong></td>
-      <td>${l.agentsCount}</td>
+      <td>${uniqueAgentsCount}</td>
+      <td>${l.recordsCount}</td>
       <td>${l.metaTotal}</td>
       <td>${l.v1}</td>
       <td>${l.v2}</td>
@@ -777,6 +844,7 @@ function renderGroupedTable(data, groupKey, selector, tableId) {
     tbody.appendChild(tr);
   });
 }
+
 
 let agentTrendsChartInstances = {};
 
@@ -801,11 +869,19 @@ function renderTrendsTable() {
       if (filterRow(row)) {
         if (!agentsHistory[agent]) {
           agentsHistory[agent] = {
-            trainer: getRowValue(row, 'TRAINER') || '-',
-            supervisor: getRowValue(row, 'SUPERVISOR') || '-',
+            trainer: '-',
+            supervisor: '-',
             months: {}
           };
         }
+
+        // Actualizamos siempre el Supervisor y Trainer con el registro más reciente del bucle
+        const currentSupervisor = getRowValue(row, 'SUPERVISOR');
+        const currentTrainer = getRowValue(row, 'TRAINER');
+
+        if (currentSupervisor) agentsHistory[agent].supervisor = currentSupervisor;
+        if (currentTrainer) agentsHistory[agent].trainer = currentTrainer;
+
         agentsHistory[agent].months[monthKey] = {
           v1: parseNum(getRowValue(row, 'V1')),
           v2: parseNum(getRowValue(row, 'V2')),
@@ -935,7 +1011,7 @@ function renderTrainerSessions(data) {
           let producto = parseSessionField(rawCellContent, '📚 Producto');
           let objeciones = parseSessionField(rawCellContent, '🛡️ Objeciones');
           let cierre = parseSessionField(rawCellContent, '🤝 Cierre');
-          let acuerdosEstado = parseSessionField(rawCellContent, '📌 Acuerdos \\+ Estado');
+          let acuerdosEstado = parseSessionField(rawCellContent, '📌 Acuerdos');
 
           if (fecha === '-') {
             const dateMatch = rawCellContent.match(/\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4}/);
@@ -979,7 +1055,7 @@ function renderTrainerSessions(data) {
           <div><strong>Producto:</strong> ${s.producto}</div>
           <div><strong>Objeciones:</strong> ${s.objeciones}</div>
           <div><strong>Cierre:</strong> ${s.cierre}</div>
-          <div style="grid-column: 1 / -1;"><strong>Acuerdos + Estado:</strong> ${s.acuerdosEstado}</div>
+          <div><strong>Acuerdos + Estado:</strong> ${s.acuerdosEstado}</div>
         </div>
       </div>
     `).join('');
@@ -1558,7 +1634,7 @@ function renderHeaderSummary() {
   activeAgentsLastMonth.forEach(agentName => {
     const agentObj = fullAgentsMap[agentName];
     if (agentObj) {
-      if (hasThreeConsecutiveLowMonths(agentObj.monthsData)) {
+      if (hasLastThreeLowMonths(agentObj.monthsData)) {
         countCriticalRisk++;
       }
       if (hasTwoConsecutiveGreenMonths(agentObj.monthsData)) {
@@ -2088,6 +2164,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('filter-mes').addEventListener('change', loadDashboardData);
   document.getElementById('btn-reset').addEventListener('click', resetAllFilters);
+  document.getElementById('filter-unassigned')?.addEventListener('change', filterData);
   
   preloadAllMonths();
 
