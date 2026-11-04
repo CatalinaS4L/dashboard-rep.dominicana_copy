@@ -1,6 +1,6 @@
-// =====================================================
+// ======================================================
 // 1. ENLACES DIRECTOS A GOOGLE SHEETS REP. DOMINICANA
-// =====================================================
+// ======================================================
 const MONTH_URLS = {
   marzo: `https://docs.google.com/spreadsheets/d/e/2PACX-1vSlK47Jfhz-MrQlFc-dZEH7NMOR61KdSLDfC83scipF55FrLuHC2WutieEgEICJlmVS-RYgpLbDuv_u/pub?gid=0&single=true&output=csv`,
   abril: `https://docs.google.com/spreadsheets/d/e/2PACX-1vSlK47Jfhz-MrQlFc-dZEH7NMOR61KdSLDfC83scipF55FrLuHC2WutieEgEICJlmVS-RYgpLbDuv_u/pub?gid=447454925&single=true&output=csv`,
@@ -31,6 +31,7 @@ let onlyRegularPerformers = false;
 let sortState = {
   'agents-table': { column: null, isAsc: true },
   'focus-table': { column: null, isAsc: true },
+  'trainers-table': { column: null, isAsc: true },
   'supervisors-table': { column: null, isAsc: true },
   'coordinators-table': { column: null, isAsc: true },
   'diagnostic-table': { column: null, isAsc: true }
@@ -501,6 +502,8 @@ function handleSort(tableId, columnKey) {
     applyAgentSort('agents-table');
   } else if (tableId === 'focus-table') {
     renderFocusTable(filteredData);
+  } else if (tableId === 'trainers-table') {
+    renderGroupedTable(filteredData, 'TRAINER', '#trainers-table tbody', 'trainers-table');
   } else if (tableId === 'supervisors-table') {
     renderGroupedTable(filteredData, 'SUPERVISOR', '#supervisors-table tbody', 'supervisors-table');
   } else if (tableId === 'coordinators-table') {
